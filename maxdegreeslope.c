@@ -69,5 +69,5 @@ char maxdegreeslope(int16_t* ulpixel, int blockhorzsize, int blockvertsize, long
 		}
 	}
 
-	return atan(maxslope)*180/PI;  //chnage to degree slope
+	return (char)(atan(maxslope)*180.0/PI+0.5);  //chnage to degree slope
 }
