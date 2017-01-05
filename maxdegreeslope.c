@@ -1,4 +1,4 @@
-#include "maxpctslope.h"
+#include "maxdegreeslope.h"
 
 
 //This function returns the value at the pixel given by i,j in the block with the given pointer to the upper left pixel
