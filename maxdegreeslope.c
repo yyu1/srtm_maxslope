@@ -2,7 +2,7 @@
 
 
 //This function returns the value at the pixel given by i,j in the block with the given pointer to the upper left pixel
-inline int16_t value(int16_t* ulpixel, int i, int j, long imagehorzsize) {
+static inline int16_t value(int16_t* ulpixel, int i, int j, long imagehorzsize) {
 	return *(ulpixel + (j*imagehorzsize) + i);
 }
 
