@@ -19,79 +19,97 @@
 #include "maxdegreeslope.h"
 
 //Image size and blocking settings
-#define IMAGEXDIM 1296000
-#define IMAGEYDIM 475200
-#define BLOCKS 10
-#define SUBBLOCKS 20
+#define IMAGEXDIM 1296000ULL
+#define IMAGEYDIM 475200ULL
+#define BLOCKS 10ULL
+#define SUBBLOCKS 20ULL
 
 
 
 int main() {
 	
-	char infile[100] = "/nobackupp6/nexprojects/CMS-ALOS/srtm1sec_mosaic/global_srtm3_aster_mosaic_1sec.int"
-	char outfile[100] = "/nobackupp6/nexprojects/CMS-ALOS/srtm1sec_mosaic/global_srtm3_aster_maxdegreeslope_3sec.byt"
+	char infile[100] = "/nobackupp6/nexprojects/CMS-ALOS/srtm1sec_mosaic/global_srtm3_aster_mosaic_1sec.int";
+	char outfile[100] = "/nobackupp6/nexprojects/CMS-ALOS/srtm1sec_mosaic/global_srtm3_aster_maxdegreeslope_3sec.byt";
+	char logfile[100] = "/nobackupp6/nexprojects/CMS-ALOS/srtm1sec_mosaic/maxslope_3sec.log";
 
-	printf("Processing SRTM with input file: %s and output file: %s \n", infile, outfile);
+	//Open log file
+	FILE* log_file_ptr;
+	log_file_ptr = fopen(logfile, "w");
+	if (!log_file_ptr)
+	{
+		printf("Unable to open log file!\n");
+		return 1;
+	}
+
+	fprintf(log_file_ptr,"Processing SRTM with input file: %s and output file: %s \n", infile, outfile);
 
 
 	//Print time stamp
 	time_t ltime;
 	ltime = time(NULL);
-	printf("Starting process at: %s\n",asctime(localtime(&ltime)));
+	fprintf(log_file_ptr,"Starting process at: %s\n",asctime(localtime(&ltime)));
 
 
 	//Allocate heap memory
 	unsigned static long long block_pixels = IMAGEXDIM * (IMAGEYDIM / BLOCKS);
 	unsigned static long long block_x_dim = IMAGEXDIM;
 	unsigned static long long block_y_dim = IMAGEYDIM / BLOCKS;
-	unsigned static long long subblock_y_dim = block_y_dim / SUBBLOCKS;
-	unsigned static long out_block_x_dim = IMAGEXDIM / 3;
-	unsigned static long out_block_y_dim = (IMAGEYDIM / BLOCKS) / 3;
-	unsigned static long long out_block_pixels = out_block_x_dim * out_block_y_dim;
+	unsigned long long subblock_y_dim = block_y_dim / SUBBLOCKS;
+	unsigned static long long out_block_x_dim = IMAGEXDIM / 3;
+	unsigned static long long out_block_y_dim = (IMAGEYDIM / BLOCKS) / 3;
+	unsigned long long out_block_pixels = out_block_x_dim * out_block_y_dim;
+	unsigned long long subblock_pixels = block_pixels / SUBBLOCKS;
 
-	printf("Allocating memory...\n");
+	fprintf(log_file_ptr,"Allocating memory... input block is %llu pixels, output block is %llu pixels \n", block_pixels, out_block_pixels);
 	int16_t* input_block = malloc(block_pixels * sizeof(int16_t));
 	char* output_block = malloc(out_block_pixels);  //outblock is type byte, so sizeof returns 1
 
 	//Open file for input
-	printf("Opening input file...\n");
+	fprintf(log_file_ptr,"Opening input file...\n");
 	FILE* input_file_ptr;
 	input_file_ptr = fopen(infile, "rb");
 
 	if (!input_file_ptr)
 	{
-		printf("Unable to open input file!\n");
+		fprintf(log_file_ptr,"Unable to open input file!\n");
 		return 1;
 	}
 
 	//Open output file
-	printf("Opening output file...\n");
+	fprintf(log_file_ptr,"Opening output file...\n");
+	fflush(log_file_ptr);
 	FILE* output_file_ptr;
 	output_file_ptr = fopen(outfile, "wb");
 	if (!output_file_ptr)
 	{
-		printf("Unable to open output file!\n");
+		fprintf(log_file_ptr,"Unable to open output file!\n");
+		fflush(log_file_ptr);	
 		return 1;
 	}
 
+	//Flush buffer
+	fflush(stdout);
+	fflush(log_file_ptr);
+
 	//Processing loop
-	static float vert_pixel_size = 30.87 //Vertical pixel size does not change.  30.87 meters
-	static float top_latitude = 76.0 //Top latitude at the top of the entire image
+	static float vert_pixel_size = 30.87; //Vertical pixel size does not change.  30.87 meters
+	static float top_latitude = 76.0; //Top latitude at the top of the entire image
 
 	for(int block_i=0; block_i < BLOCKS; ++block_i) {
 		ltime = time(NULL);
-		printf("Working on block %d of %d: %s \n", block_i+1, BLOCKS, asctime(localtime(&ltime)));
-		
+		fprintf(log_file_ptr,"Working on block %d of %d: %s \n", block_i+1, BLOCKS, asctime(localtime(&ltime)));
+		fflush(log_file_ptr);	
 		//Read input block
-		printf("Reading input block...\n");
+		fprintf(log_file_ptr,"Reading input block...\n");
+		fflush(log_file_ptr);	
 		fread(input_block, sizeof(int16_t), block_pixels, input_file_ptr);
-
 		//Process this block, OpenMP parallelization happens here.
-		printf("Processing block...\n");
+		fprintf(log_file_ptr,"Processing block...\n");
+		fflush(log_file_ptr);	
 		#pragma omp parallel
 		{
 			#pragma omp for
-			for(int subblock_i=0; subblock_i<SUBBLOCKS; ++subblock_i) {
+			for(unsigned long long subblock_i=0; subblock_i<SUBBLOCKS; ++subblock_i) {
 				//Each subblock will start at the left most column, pointted to by subblock_ptr
 				int16_t* subblock_ptr = input_block+(subblock_i*subblock_pixels);
 				char* out_subblock_ptr = output_block+(subblock_i*subblock_pixels);
@@ -108,7 +126,7 @@ int main() {
 					horz_pixel_size = 30.87 * cos(latitude*PI/180.0); // convert latitude to radians
 					for(unsigned long long i=0; i<out_block_x_dim; ++i) {  //Subblocking is along y-axis only
 						//Calculate maximum slope in degrees for the given output pixel
-						*(out_subblock_ptr+j*out_block_xdim+i) = maxdegreeslope(subblock_ptr, 3, 3, IMAGEXDIM, horz_pixel_size, vert_pixel_size);
+						*(out_subblock_ptr+j*out_block_x_dim+i) = maxdegreeslope(subblock_ptr, 3, 3, IMAGEXDIM, horz_pixel_size, vert_pixel_size);
 
 					}
 				}
@@ -116,7 +134,8 @@ int main() {
 		}  //End of pragma omp parallel
 
 		//At this point, the output block should all be calculated, write to file
-		printf("Writing output block...\n\n");
+		fprintf(log_file_ptr,"Writing output block...\n\n");
+		fflush(log_file_ptr);	
 		fwrite(output_block, sizeof(char), out_block_pixels, output_file_ptr);
 	}//End of all blocks
 
@@ -125,7 +144,7 @@ int main() {
 	fclose(output_file_ptr);
 
 	ltime = time(NULL);
-	printf("Done! %s\n", asctime(localtime(&ltime)));
+	fprintf(log_file_ptr,"Done! %s\n", asctime(localtime(&ltime)));
 
 
 }
