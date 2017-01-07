@@ -59,10 +59,22 @@ int main() {
 	unsigned static long long out_block_y_dim = (IMAGEYDIM / BLOCKS) / 3;
 	unsigned long long out_block_pixels = out_block_x_dim * out_block_y_dim;
 	unsigned long long subblock_pixels = block_pixels / SUBBLOCKS;
+	unsigned long long out_subblock_pixels = subblock_pixels / 9;
 
 	fprintf(log_file_ptr,"Allocating memory... input block is %llu pixels, output block is %llu pixels \n", block_pixels, out_block_pixels);
 	int16_t* input_block = malloc(block_pixels * sizeof(int16_t));
+	if (input_block == 0) {
+		fprintf(log_file_ptr, "Unable to allocate memory for input block.  Exiting program.\n");
+		fflush(log_file_ptr);
+		return 1;
+	}
+
 	char* output_block = malloc(out_block_pixels);  //outblock is type byte, so sizeof returns 1
+	if (output_block == 0) {
+		fprintf(log_file_ptr, "Unable to allocate memory for output block.  Exiting program.\n");
+		fflush(log_file_ptr);
+		return 1;
+	}
 
 	//Open file for input
 	fprintf(log_file_ptr,"Opening input file...\n");
@@ -112,7 +124,7 @@ int main() {
 			for(unsigned long long subblock_i=0; subblock_i<SUBBLOCKS; ++subblock_i) {
 				//Each subblock will start at the left most column, pointted to by subblock_ptr
 				int16_t* subblock_ptr = input_block+(subblock_i*subblock_pixels);
-				char* out_subblock_ptr = output_block+(subblock_i*subblock_pixels);
+				char* out_subblock_ptr = output_block+(subblock_i*out_subblock_pixels);
 				float latitude, horz_pixel_size;
 				float subblock_top_latitude = top_latitude - ((float)((block_i * block_y_dim)+subblock_i*subblock_y_dim))/60.0/60.0;   //Convert to degrees
 
@@ -126,7 +138,8 @@ int main() {
 					horz_pixel_size = 30.87 * cos(latitude*PI/180.0); // convert latitude to radians
 					for(unsigned long long i=0; i<out_block_x_dim; ++i) {  //Subblocking is along y-axis only
 						//Calculate maximum slope in degrees for the given output pixel
-						*(out_subblock_ptr+j*out_block_x_dim+i) = maxdegreeslope(subblock_ptr, 3, 3, IMAGEXDIM, horz_pixel_size, vert_pixel_size);
+						int16_t* calc_block_ulpixel = subblock_ptr+(j*3ULL*IMAGEXDIM)+i*3ULL;
+						*(out_subblock_ptr+j*out_block_x_dim+i) = maxdegreeslope(calc_block_ulpixel, 3, 3, IMAGEXDIM, horz_pixel_size, vert_pixel_size);
 
 					}
 				}
